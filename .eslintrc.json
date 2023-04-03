@@ -91,19 +91,7 @@
     "arrow-parens": ["error", "always"],
     "no-plusplus": "off",
     "constructor-super": "off",
-    "no-mixed-operators": [
-      "error",
-      {
-        "groups": [
-          ["+", "-", "*", "/", "%", "**"],
-          ["&", "|", "^", "~", "<<", ">>", ">>>"],
-          ["==", "!=", "===", "!==", ">", ">=", "<", "<="],
-          ["&&", "||"],
-          ["in", "instanceof"]
-        ],
-        "allowSamePrecedence": true
-      }
-    ],
+    "no-mixed-operators": "off",
     "import/extensions": "off",
     "import/prefer-default-export": "off",
     "no-unused-expressions": "error",
@@ -126,7 +114,6 @@
         "ObjectExpression": { "multiline": true, "consistent": true },
         "ObjectPattern": { "multiline": true, "consistent": true }
       }
-    ],
-    "lines-between-class-members": ["error", "always", { "exceptAfterSingleLine": true }]
+    ]
   }
 }
