@@ -87,9 +87,27 @@
 
       <template v-if="tickers.length">
         <hr class="w-full border-t border-gray-600 my-4" />
+        <div>
+          <button
+            v-if="page > 1"
+            class="my-4 mx-2 inline-flex items-center py-2 px-4 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-full text-white bg-gray-600 hover:bg-gray-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+            @click="page -= 1"
+          >
+            Назад
+          </button>
+          <button
+            v-if="hasNextPage"
+            class="my-4 mx-2 inline-flex items-center py-2 px-4 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-full text-white bg-gray-600 hover:bg-gray-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+            @click="page += 1"
+          >
+            Вперед
+          </button>
+          <div>Фильтр: <input v-model="filterTickerName" /></div>
+        </div>
+        <hr class="w-full border-t border-gray-600 my-4" />
         <dl class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
           <div
-            v-for="tick of tickers"
+            v-for="tick of filteredTickers()"
             :key="tick.name"
             class="bg-white overflow-hidden shadow rounded-lg border-purple-800 border-solid cursor-pointer"
             :class="{ 'border-4': sel === tick }"
@@ -176,6 +194,12 @@ export default {
       sel: null,
       graph: [],
 
+      // Pagination
+      page: 1,
+      hasNextPage: true,
+
+      filterTickerName: '',
+
       // Existing tickers loaded from API for Hint showing
       coinsList: [],
       isLoadingCoinsList: true,
@@ -202,7 +226,41 @@ export default {
     },
   },
 
+  watch: {
+    filterTickerName() {
+      this.page = 1;
+
+      const { pathname } = window.location;
+
+      window.history.pushState(
+        null,
+        document.title,
+        `${pathname}?filter=${this.filterTickerName}&page=${this.page}`
+      );
+    },
+
+    page() {
+      const { pathname } = window.location;
+
+      window.history.pushState(
+        null,
+        document.title,
+        `${pathname}?filter=${this.filterTickerName}&page=${this.page}`
+      );
+    },
+  },
+
   created() {
+    const { filter, page } = Object.fromEntries(new URL(window.location).searchParams.entries());
+
+    if (filter) {
+      this.filterTickerName = filter;
+    }
+
+    if (page) {
+      this.page = page;
+    }
+
     const tickersData = localStorage.getItem('cryptonomicon-list');
 
     if (tickersData) {
@@ -223,6 +281,7 @@ export default {
 
       const currentTicker = { name: this.ticker, price: '-' };
       this.tickers.push(currentTicker);
+      this.filterTickerName = '';
 
       localStorage.setItem('cryptonomicon-list', JSON.stringify(this.tickers));
       this.subscribeToUpdates(currentTicker.name);
@@ -240,6 +299,19 @@ export default {
 
     handleDelete(tickerToRemove) {
       this.tickers = this.tickers.filter((ticker) => ticker !== tickerToRemove);
+    },
+
+    filteredTickers() {
+      const start = (this.page - 1) * 6;
+      const end = this.page * 6;
+
+      const filteredTickers = this.tickers.filter((ticker) =>
+        ticker.name.toLowerCase().includes(this.filterTickerName.toLowerCase())
+      );
+
+      this.hasNextPage = filteredTickers.length > end;
+
+      return filteredTickers.slice(start, end);
     },
 
     subscribeToUpdates(tickerName) {
