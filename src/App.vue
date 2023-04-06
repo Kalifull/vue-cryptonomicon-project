@@ -30,7 +30,7 @@
       <section>
         <div class="flex">
           <div class="max-w-xs">
-            <label for="wallet" class="block text-sm font-medium text-gray-700">Тикер</label>
+            <label for="wallet" class="block mb-2 text-sm font-medium text-gray-700">Тикер</label>
             <div class="mt-1 relative rounded-md shadow-md">
               <input
                 id="wallet"
@@ -103,8 +103,9 @@
             Вперед
           </button>
           <div>
-            Фильтр:
+            <label for="filter" class="block mb-2 text-sm font-medium text-gray-700">Фильтр</label>
             <input
+              id="filter"
               v-model="filterTickerName"
               type="text"
               placeholder="Что хотите найти?"
@@ -123,7 +124,9 @@
           >
             <div class="px-4 py-5 sm:p-6 text-center">
               <dt class="text-sm font-medium text-gray-500 truncate">{{ tick.name }} - USD</dt>
-              <dd class="mt-1 text-3xl font-semibold text-gray-900">{{ tick.price }}</dd>
+              <dd class="mt-1 text-3xl font-semibold text-gray-900">
+                {{ formatPrice(tick.price) }}
+              </dd>
             </div>
             <div class="w-full border-t border-gray-200"></div>
 
@@ -192,7 +195,7 @@
 </template>
 
 <script>
-import { fetchCoinsList } from './api';
+import { fetchCoinsList, subscribeToTicker, unsubscribeFromTicker } from './api';
 
 export default {
   name: 'App',
@@ -313,7 +316,9 @@ export default {
 
     if (tickersData) {
       this.tickers = JSON.parse(tickersData);
-      this.tickers.forEach((ticker) => this.subscribeToUpdates(ticker.name));
+      this.tickers.forEach((ticker) => {
+        subscribeToTicker(ticker.name, (newPrice) => this.updateTicker(ticker.name, newPrice));
+      });
     }
   },
 
@@ -329,11 +334,13 @@ export default {
 
       const currentTicker = { name: this.ticker, price: '-' };
       this.tickers = [...this.tickers, currentTicker];
+
       this.filterTickerName = '';
-
-      this.subscribeToUpdates(currentTicker.name);
-
       this.ticker = '';
+
+      subscribeToTicker(currentTicker.name, (newPrice) =>
+        this.updateTicker(currentTicker.name, newPrice)
+      );
     },
 
     autocompleteTicker(ticker) {
@@ -350,21 +357,27 @@ export default {
       if (this.selectedTicker === tickerToRemove) {
         this.selectedTicker = null;
       }
+
+      unsubscribeFromTicker(tickerToRemove.name);
     },
 
-    subscribeToUpdates(tickerName) {
-      setInterval(async () => {
-        const response = await fetch(
-          `https://min-api.cryptocompare.com/data/price?fsym=${tickerName}&tsyms=USD&api_key=5a8c3852e9261ef18e5909d2633b35f84e823c9661d2bcd00f7b398a067bde12`
-        );
-        const data = await response.json();
-        this.tickers.find(({ name }) => name === tickerName).price =
-          data.USD > 1 ? data.USD.toFixed(2) : data.USD.toPrecision(2);
+    formatPrice(normalizedPrice) {
+      if (normalizedPrice === '-') {
+        return normalizedPrice;
+      }
 
-        if (this.selectedTicker?.name === tickerName) {
-          this.graph.push(data.USD);
-        }
-      }, 5000);
+      return normalizedPrice > 1 ? normalizedPrice.toFixed(2) : normalizedPrice.toPrecision(2);
+    },
+
+    updateTicker(tickerName, price) {
+      this.tickers
+        .filter(({ name }) => name === tickerName)
+        .forEach((ticker) => {
+          if (ticker === this.selectedTicker) {
+            this.graph.push(price);
+          }
+          ticker.price = price;
+        });
     },
 
     async loadCryptoCurrencyList() {
