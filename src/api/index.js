@@ -6,6 +6,7 @@ const tickersHandlers = new Map();
 const socket = new WebSocket(`wss://streamer.cryptocompare.com/v2?api_key=${API_KEY}`);
 
 const AGGREGATE_INDEX = '5';
+const INVALID_COIN_TYPE = '500';
 
 export const fetchCoinsList = async () => {
   const response = await fetch(`${LOAD_CURRENCY_URL}?api_key=${API_KEY}`);
@@ -15,14 +16,27 @@ export const fetchCoinsList = async () => {
 };
 
 socket.addEventListener('message', (event) => {
-  const { TYPE: type, FROMSYMBOL: currency, PRICE: newPrice } = JSON.parse(event.data);
+  let isValid = true;
 
-  if (type !== AGGREGATE_INDEX || !newPrice) {
+  const {
+    TYPE: type,
+    FROMSYMBOL: currency,
+    PRICE: newPrice,
+    PARAMETER: parameter,
+  } = JSON.parse(event.data);
+
+  if (type === INVALID_COIN_TYPE) {
+    isValid = false;
+    const newPrice = '-';
+    const currency = parameter.substring(9, parameter.length - 4);
+    const handlers = tickersHandlers.get(currency) || [];
+    handlers.forEach((fn) => fn(newPrice, isValid));
+  } else if (type !== AGGREGATE_INDEX || !newPrice) {
     return;
   }
 
   const handlers = tickersHandlers.get(currency) || [];
-  handlers.forEach((fn) => fn(newPrice));
+  handlers.forEach((fn) => fn(newPrice, isValid));
 });
 
 const sendToWebSocket = (message) => {
@@ -60,3 +74,4 @@ export const unsubscribeFromTicker = (ticker) => {
   tickersHandlers.delete(ticker);
   unsubscribeFromTickerOnWebSocket(ticker);
 };
+

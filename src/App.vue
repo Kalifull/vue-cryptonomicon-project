@@ -122,7 +122,10 @@
             :class="{ 'border-4': selectedTicker === tick }"
             @click="selectTicker(tick)"
           >
-            <div class="px-4 py-5 sm:p-6 text-center">
+            <div
+              class="px-4 py-5 sm:p-6 text-center"
+              :class="{ 'bg-red-300': tickersInvalid.includes(tick.name) }"
+            >
               <dt class="text-sm font-medium text-gray-500 truncate">{{ tick.name }} - USD</dt>
               <dd class="mt-1 text-3xl font-semibold text-gray-900">
                 {{ formatPrice(tick.price) }}
@@ -153,11 +156,14 @@
         <hr class="w-full border-t border-gray-600 my-4" />
       </template>
 
-      <section v-if="selectedTicker" class="relative">
+      <section
+        v-if="selectedTicker && !tickersInvalid.includes(selectedTicker.name)"
+        class="relative"
+      >
         <h3 class="text-lg leading-6 font-medium text-gray-900 my-8">
           {{ selectedTicker.name }} - USD
         </h3>
-        <div class="flex items-end border-gray-600 border-b border-l h-64">
+        <div ref="graph" class="flex items-end border-gray-600 border-b border-l h-64">
           <div
             v-for="(bar, index) of normalizedGraph"
             :key="index"
@@ -190,6 +196,12 @@
           </svg>
         </button>
       </section>
+      <div
+        v-else-if="selectedTicker && tickersInvalid.includes(selectedTicker.name)"
+        class="flex justify-center text-lg leading-6 font-medium text-gray-900 my-8"
+      >
+        Конвертация из {{ selectedTicker.name }} в USD не возможна для данного тикера
+      </div>
     </div>
   </div>
 </template>
@@ -204,11 +216,13 @@ export default {
     return {
       ticker: '',
       filterTickerName: '',
+      tickersInvalid: [],
 
       tickers: [],
       selectedTicker: null,
 
       graph: [],
+      maxGraphElements: 1,
 
       maxAvailableHint: 4,
       page: 1,
@@ -317,13 +331,21 @@ export default {
     if (tickersData) {
       this.tickers = JSON.parse(tickersData);
       this.tickers.forEach((ticker) => {
-        subscribeToTicker(ticker.name, (newPrice) => this.updateTicker(ticker.name, newPrice));
+        subscribeToTicker(ticker.name, (newPrice, isValid) =>
+          this.updateTicker(ticker.name, newPrice, isValid)
+        );
       });
     }
   },
 
   mounted() {
     this.loadCryptoCurrencyList();
+
+    window.addEventListener('resize', this.calculateMAxGraphElements);
+  },
+
+  beforeUnmount() {
+    window.removeEventListener('resize', this.calculateMAxGraphElements);
   },
 
   methods: {
@@ -338,8 +360,8 @@ export default {
       this.filterTickerName = '';
       this.ticker = '';
 
-      subscribeToTicker(currentTicker.name, (newPrice) =>
-        this.updateTicker(currentTicker.name, newPrice)
+      subscribeToTicker(currentTicker.name, (newPrice, isValid) =>
+        this.updateTicker(currentTicker.name, newPrice, isValid)
       );
     },
 
@@ -369,15 +391,31 @@ export default {
       return normalizedPrice > 1 ? normalizedPrice.toFixed(2) : normalizedPrice.toPrecision(2);
     },
 
-    updateTicker(tickerName, price) {
+    updateTicker(tickerName, price, isValid) {
       this.tickers
         .filter(({ name }) => name === tickerName)
         .forEach((ticker) => {
-          if (ticker === this.selectedTicker) {
+          if (ticker === this.selectedTicker && isValid) {
             this.graph.push(price);
+            while (this.graph.length > this.maxGraphElements) {
+              this.graph.shift();
+            }
           }
+
+          if (!isValid) {
+            this.tickersInvalid.push(tickerName);
+          }
+
           ticker.price = price;
         });
+    },
+
+    calculateMAxGraphElements() {
+      if (!this.$refs.graph) {
+        return;
+      }
+
+      this.maxGraphElements = this.$refs.graph.clientWidth / 38;
     },
 
     async loadCryptoCurrencyList() {
