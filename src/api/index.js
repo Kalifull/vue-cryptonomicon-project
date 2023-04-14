@@ -74,4 +74,3 @@ export const unsubscribeFromTicker = (ticker) => {
   tickersHandlers.delete(ticker);
   unsubscribeFromTickerOnWebSocket(ticker);
 };
-
